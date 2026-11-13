@@ -64,18 +64,18 @@ def moeda_br(valor):
 card1, card2, card3 = st.columns(3)
 card1.metric("Vendas no período", moeda_br(total_vendas))
 card2.metric("Média mensal", moeda_br(media_mensal))
-card3.metric("Categoria líder", categoria_lider)
+card3.metric("Categoria líder", str(categoria_lider))
 
 # Agregações para os gráficos.
 vendas_mensais = (
-    dados.groupby("Mês", as_index=False)["Vendas"]
-    .sum()
-    .sort_values("Mês")
+    dados.groupby("Mês", as_index=False)
+    .agg(Vendas=("Vendas", "sum"))
+    .sort_values(by="Mês")
 )
 vendas_categorias = (
-    dados.groupby("Categoria", as_index=False)["Vendas"]
-    .sum()
-    .sort_values("Vendas", ascending=False)
+    dados.groupby("Categoria", as_index=False)
+    .agg(Vendas=("Vendas", "sum"))
+    .sort_values(by="Vendas", ascending=False)
 )
 
 coluna_linha, coluna_pizza = st.columns(2)
@@ -113,8 +113,9 @@ figura_barras = px.bar(
     color="Categoria",
     title="Vendas totais por categoria",
     labels={"Categoria": "Categoria", "Vendas": "Vendas (R$)"},
-    text_auto=".2s",
+    text_auto=True,
 )
+figura_barras.update_traces(texttemplate="%{y:.2s}")
 figura_barras.update_layout(showlegend=False, xaxis_title=None, yaxis_title="Vendas (R$)")
 st.plotly_chart(figura_barras, use_container_width=True)
 
