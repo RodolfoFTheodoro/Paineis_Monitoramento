@@ -1,10 +1,11 @@
 import pandas as pd
 import plotly.express as px
+from plotly.graph_objects import Figure
 import streamlit as st
 
 
 st.set_page_config(
-    page_title="Painel SINASC - Grande ABC",
+    page_title="Panorama Materno-Infantil do Grande ABC",
     page_icon="👶",
     layout="wide",
 )
@@ -135,14 +136,14 @@ st.markdown("""
     color: #1f2d3d;
 }
 .panel-header {
-    background: #dcecf7;
-    border-left: 8px solid #0072B2;
-    border-radius: 12px;
+    background: #eef1f3;
+    border-left: 6px solid #697780;
+    border-radius: 10px;
     padding: 18px 24px;
     margin-bottom: 14px;
 }
 .panel-header h1 {
-    color: #16324f;
+    color: #29343c;
     font-size: 2rem;
     margin: 0 0 4px 0;
 }
@@ -151,24 +152,38 @@ st.markdown("""
     font-size: 1rem;
     margin: 0;
 }
-.filter-box {
-    background: #f6f8fa;
-    border: 1px solid #dbe2ea;
-    border-radius: 12px;
-    padding: 12px 16px;
-    margin-bottom: 14px;
-}
 .read-caption {
-    color: #52616b;
+    color: #59656e;
     font-size: 0.92rem;
-    margin: 2px 0 18px 0;
+    margin: -4px 0 10px 0;
+}
+[data-testid="stMultiSelectTagsContainer"] span:has(> button[aria-label^="Remove"]) {
+    background-color: #e9edef !important;
+    border: 1px solid #d0d6da !important;
+    color: #36414a !important;
+}
+[data-testid="stMultiSelectTagsContainer"] button[aria-label^="Remove"] svg {
+    fill: #59656e !important;
+}
+[data-testid="stMultiSelect"] [data-baseweb="select"] > div {
+    border-color: #cbd2d7 !important;
+}
+[data-testid="stMultiSelect"] [data-baseweb="select"] > div:focus-within {
+    border-color: #7b8790 !important;
+    box-shadow: 0 0 0 2px #49545d !important;
+}
+button:focus-visible,
+input:focus-visible,
+[role="combobox"]:focus-visible {
+    outline: 3px solid #49545d !important;
+    outline-offset: 2px !important;
 }
 </style>
 """, unsafe_allow_html=True)
 
 st.markdown("""
 <div class="panel-header">
-  <h1>Painel de Monitoramento de Nascimentos</h1>
+    <h1>Panorama Materno-Infantil do Grande ABC</h1>
   <p>Responsáveis: Beatriz Jora • Laryssa Theodoro • Rodolfo Theodoro</p>
 </div>
 """, unsafe_allow_html=True)
@@ -182,38 +197,54 @@ nomes_meses = {
 }
 sexos = ["Masculino", "Feminino", "Ignorado"]
 
+if "filtro_municipios" not in st.session_state:
+    st.session_state["filtro_municipios"] = municipios
+if "filtro_meses" not in st.session_state:
+    st.session_state["filtro_meses"] = meses_disponiveis
+if "filtro_sexos" not in st.session_state:
+    st.session_state["filtro_sexos"] = sexos
+
+
+def selecionar_todos_filtros() -> None:
+    st.session_state["filtro_municipios"] = municipios
+    st.session_state["filtro_meses"] = meses_disponiveis
+    st.session_state["filtro_sexos"] = sexos
+
+
 with st.container():
-    st.markdown('<div class="filter-box">', unsafe_allow_html=True)
     filtro_municipios, filtro_meses, filtro_sexos = st.columns([2, 1, 1])
 
     with filtro_municipios:
-        st.markdown("**Município**")
-        municipios_selecionados = []
-        municipio_colunas = st.columns(4)
-        for indice, municipio_nome in enumerate(municipios):
-            if municipio_colunas[indice % 4].checkbox(
-                municipio_nome,
-                value=True,
-                key=f"mun_{municipio_nome}",
-            ):
-                municipios_selecionados.append(municipio_nome)
+        municipios_selecionados = st.multiselect(
+            "Município",
+            options=municipios,
+            key="filtro_municipios",
+        )
+        st.caption(f"{len(municipios_selecionados)} de {len(municipios)} selecionados")
 
     with filtro_meses:
         meses_selecionados = st.multiselect(
             "Mês",
             options=meses_disponiveis,
             format_func=lambda valor: nomes_meses.get(int(valor), str(valor)),
-            default=meses_disponiveis,
+            key="filtro_meses",
         )
+        st.caption(f"{len(meses_selecionados)} de {len(meses_disponiveis)} selecionados")
 
     with filtro_sexos:
         sexos_selecionados = st.multiselect(
             "Sexo",
             options=sexos,
-            default=sexos,
+            key="filtro_sexos",
         )
+        st.caption(f"{len(sexos_selecionados)} de {len(sexos)} selecionados")
 
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.button(
+        "Selecionar todos",
+        help="Restaura todos os municípios, meses e sexos.",
+        on_click=selecionar_todos_filtros,
+        key="selecionar_todos_filtros",
+    )
 
 dados_filtrados = dados[
     dados["Município"].isin(municipios_selecionados)
@@ -229,13 +260,13 @@ total = len(dados_filtrados)
 sexo_validos = dados_filtrados["Sexo"].where(
     dados_filtrados["Sexo"].isin(["Masculino", "Feminino"])
 ).dropna()
-sexo_predominante = sexo_validos.value_counts().idxmax() if not sexo_validos.empty else "—"
+sexo_predominante = str(sexo_validos.value_counts().idxmax()) if not sexo_validos.empty else "—"
 qtd_sexo_predominante = int(sexo_validos.value_counts().max()) if not sexo_validos.empty else 0
 peso_medio = dados_filtrados["Pesos válidos"].mean()
 idade_media = dados_filtrados["Idade da mãe"].mean()
 
 card1, card2, card3, card4 = st.columns(4)
-card1.metric("Nascimentos", f"{total:,}".replace(".", "X").replace(",", ".").replace("X", ","))
+card1.metric("Nascimentos", f"{total:,}".replace(",", "."))
 card2.metric("Sexo predominante", sexo_predominante)
 card3.metric("Peso médio", f"{peso_medio:,.0f} g".replace(",", ".") if pd.notna(peso_medio) else "—")
 card4.metric("Idade média da mãe", f"{idade_media:.1f} anos".replace(".", ",") if pd.notna(idade_media) else "—")
@@ -243,6 +274,35 @@ card4.metric("Idade média da mãe", f"{idade_media:.1f} anos".replace(".", ",")
 st.divider()
 
 cores = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#56B4E9", "#D55E00", "#F0E442"]
+
+
+def aplicar_texto_com_contraste(figura: Figure) -> None:
+    for trace in figura.data:
+        marcador = getattr(trace, "marker", None)
+        cor_fundo = getattr(marcador, "color", None)
+        if not isinstance(cor_fundo, str) or not cor_fundo.startswith("#") or len(cor_fundo) != 7:
+            continue
+
+        canais = [int(cor_fundo[indice:indice + 2], 16) / 255 for indice in (1, 3, 5)]
+        canais_lineares = [
+            canal / 12.92 if canal <= 0.04045 else ((canal + 0.055) / 1.055) ** 2.4
+            for canal in canais
+        ]
+        luminancia = sum(
+            peso * canal
+            for peso, canal in zip((0.2126, 0.7152, 0.0722), canais_lineares)
+        )
+        trace.update(textfont_color="#1f2d3d" if luminancia > 0.179 else "#ffffff")
+
+
+def exibir_grafico(titulo: str, como_ler: str, figura: Figure) -> None:
+    with st.container(border=True):
+        st.subheader(titulo)
+        st.markdown(
+            f'<p class="read-caption"><strong>Como ler:</strong> {como_ler}</p>',
+            unsafe_allow_html=True,
+        )
+        st.plotly_chart(figura, width="stretch")
 
 # 1. Nascimentos por município
 municipio = contar_categorias(dados_filtrados, "Município")
@@ -252,13 +312,12 @@ fig = px.bar(
     y="Município",
     x="Nascimentos",
     orientation="h",
-    title="Nascimentos por município de residência",
     text_auto=True,
     color="Município",
     color_discrete_sequence=cores,
 )
+fig.update_traces(textposition="outside", textfont_color="#1f2d3d", cliponaxis=False)
 fig.update_layout(
-    title={"text": "Nascimentos por município de residência", "x": 0, "font": {"size": 20}},
     yaxis_title=None,
     showlegend=False,
 )
@@ -285,26 +344,27 @@ fig_idade = px.bar(
     y="Nascimentos",
     color="Tipo de parto",
     barmode="stack",
-    title="Tipo de parto por faixa etária materna",
+    text_auto=True,
     color_discrete_map={"Vaginal": "#0072B2", "Cesáreo": "#E69F00"},
 )
+fig_idade.update_traces(textposition="inside")
+aplicar_texto_com_contraste(fig_idade)
 fig_idade.update_layout(
-    title={"text": "Tipo de parto por faixa etária materna", "x": 0, "font": {"size": 20}},
     xaxis_title="Idade da mãe",
 )
 
 linha1_col1, linha1_col2 = st.columns(2)
 with linha1_col1:
-    st.plotly_chart(fig, width="stretch")
-    st.markdown(
-        '<p class="read-caption"><strong>Como ler:</strong> a barra mais alta indica o município com mais nascimentos. As barras estão ordenadas do menor para o maior número de registros.</p>',
-        unsafe_allow_html=True,
+    exibir_grafico(
+        "Nascimentos por município de residência",
+        "A barra mais alta indica o município com mais nascimentos. As barras estão ordenadas do menor para o maior número de registros.",
+        fig,
     )
 with linha1_col2:
-    st.plotly_chart(fig_idade, width="stretch")
-    st.markdown(
-        '<p class="read-caption"><strong>Como ler:</strong> compara o tipo de parto entre idades maternas. Azul representa parto vaginal e laranja, cesárea; a idade avança da faixa mais jovem para a mais velha.</p>',
-        unsafe_allow_html=True,
+    exibir_grafico(
+        "Tipo de parto por faixa etária materna",
+        "Compara o tipo de parto entre idades maternas. Azul representa parto vaginal e laranja, cesárea; a idade avança da faixa mais jovem para a mais velha.",
+        fig_idade,
     )
 
 # 3. Peso ao nascer segundo o sexo
@@ -317,13 +377,11 @@ fig_peso = px.box(
     x="Sexo",
     y="Pesos válidos",
     color="Sexo",
-    title="Peso ao nascer segundo o sexo",
     labels={"Pesos válidos": "Peso (gramas)"},
     category_orders={"Sexo": ["Feminino", "Masculino"]},
     color_discrete_map={"Feminino": "#CC79A7", "Masculino": "#0072B2"},
 )
 fig_peso.update_layout(
-    title={"text": "Peso ao nascer segundo o sexo", "x": 0, "font": {"size": 20}},
     showlegend=False,
 )
 
@@ -336,29 +394,28 @@ fig_raca = px.bar(
     x="Raça/cor",
     y="Nascimentos",
     color="Raça/cor",
-    title="Distribuição por raça/cor",
     text_auto=True,
     category_orders={"Raça/cor": raca_ordem},
     color_discrete_sequence=cores,
 )
+fig_raca.update_traces(textposition="outside", textfont_color="#1f2d3d", cliponaxis=False)
 fig_raca.update_layout(
-    title={"text": "Distribuição por raça/cor", "x": 0, "font": {"size": 20}},
     showlegend=False,
     xaxis_title=None,
 )
 
 linha2_col1, linha2_col2 = st.columns(2)
 with linha2_col1:
-    st.plotly_chart(fig_peso, width="stretch")
-    st.markdown(
-        '<p class="read-caption"><strong>Como ler:</strong> compara pesos válidos entre nascimentos masculinos e femininos. A caixa concentra a faixa central dos dados e a linha representa a mediana em gramas.</p>',
-        unsafe_allow_html=True,
+    exibir_grafico(
+        "Peso ao nascer segundo o sexo",
+        "Compara pesos válidos entre nascimentos masculinos e femininos. A caixa concentra a faixa central dos dados e a linha representa a mediana em gramas.",
+        fig_peso,
     )
 with linha2_col2:
-    st.plotly_chart(fig_raca, width="stretch")
-    st.markdown(
-        '<p class="read-caption"><strong>Como ler:</strong> mostra quantos nascimentos foram registrados em cada raça/cor. As categorias aparecem da menor para a maior ocorrência.</p>',
-        unsafe_allow_html=True,
+    exibir_grafico(
+        "Distribuição por raça/cor",
+        "Mostra quantos nascimentos foram registrados em cada raça/cor. As categorias aparecem da menor para a maior ocorrência.",
+        fig_raca,
     )
 
 # 5. Tipo de parto segundo a escolaridade materna
@@ -382,19 +439,20 @@ fig_escolaridade = px.bar(
     y="Nascimentos",
     color="Tipo de parto",
     barmode="stack",
-    title="Tipo de parto segundo a escolaridade materna",
+    text_auto=True,
     category_orders={"Escolaridade": ordem_escolaridade},
     color_discrete_map={"Vaginal": "#0072B2", "Cesáreo": "#E69F00"},
 )
+fig_escolaridade.update_traces(textposition="inside")
+aplicar_texto_com_contraste(fig_escolaridade)
 fig_escolaridade.update_layout(
-    title={"text": "Tipo de parto segundo a escolaridade materna", "x": 0, "font": {"size": 20}},
     xaxis_tickangle=-20,
 )
 
-st.plotly_chart(fig_escolaridade, width="stretch")
-st.markdown(
-    '<p class="read-caption"><strong>Como ler:</strong> relaciona o tipo de parto com os anos de estudo da mãe. As categorias avançam da menor para a maior escolaridade; azul representa vaginal e laranja, cesárea.</p>',
-    unsafe_allow_html=True,
+exibir_grafico(
+    "Tipo de parto segundo a escolaridade materna",
+    "Relaciona o tipo de parto com os anos de estudo da mãe. As categorias avançam da menor para a maior escolaridade; azul representa vaginal e laranja, cesárea.",
+    fig_escolaridade,
 )
 
 st.divider()
@@ -405,8 +463,15 @@ with st.expander("Visualizar dados filtrados"):
         "Consultas pré-natais", "Peso ao nascer", "Raça/cor",
         "Escolaridade",
     ]
+    dados_exportacao = dados_filtrados[colunas].sort_values("Data de nascimento")
+    st.download_button(
+        "Baixar dados filtrados (CSV)",
+        data=dados_exportacao.to_csv(index=False).encode("utf-8-sig"),
+        file_name="nascimentos_filtrados.csv",
+        mime="text/csv",
+    )
     st.dataframe(
-        dados_filtrados[colunas].sort_values("Data de nascimento"),
+        dados_exportacao,
         width="stretch",
         hide_index=True,
     )
